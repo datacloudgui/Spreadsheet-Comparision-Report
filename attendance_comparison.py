@@ -28,6 +28,7 @@ def extract_list_by_index(sheet, row_start, column):
     for row in range (row_start+1, sheet.max_row+1):
         if(sheet[column + str(row)].value!= None):
             students.append(sheet[column + str(row)].value)
+    students = list(dict.fromkeys(students)) #removing duplicates
     return students
 
 def attended_split(list_students, attendance_students):
@@ -58,14 +59,42 @@ def attended_split(list_students, attendance_students):
     return attended_students, attended_not_in_list
 
 def extract_absence_students(list_students, attended_students):
-    absence_students = list_students
+    absence_students = list_students[:]
 
     for item in attended_students:
         absence_students.remove(item)
     return absence_students
 
+def write_column_report(sheet, column, title, data):
+    sheet[column+'1']=title
+    for row in range (0, len(data)):
+        sheet[column + str(row+2)] = data[row]
+
+def write_report(class_name, list_students, attended_students, attended_not_in_list, absence_students):
+    
+    columns_and_titles = []
+    columns_and_titles.append(('A', 'Lista de estudiantes', list_students))
+    columns_and_titles.append(('B', 'Asistentes en lista', attended_students))
+    columns_and_titles.append(('C', 'Asistentes NO en lista', attended_not_in_list))
+    columns_and_titles.append(('D', 'Ausentes', absence_students))
+
+    try:
+        wb = openpyxl.load_workbook("report.xlsx")
+        sheet = wb.create_sheet("sheet_new")
+        sheet.title = class_name
+    except:
+        print('No se encuentra report.xlsx, se creara este archivo')
+        wb = Workbook()
+        sheet = wb.active
+        sheet.title = class_name
+
+    for item in columns_and_titles:
+        write_column_report(sheet, item[0], item[1], item[2])
+    wb.save("report.xlsx")
+
 if __name__ == "__main__":
-    list_file='servos.xlsx'
+    class_list=['matematicas'] #Agregar los cursos necesarios
+
     list_sheet_name='Sheet1'
     list_column='B'
     list_word='Apellidos y Nombres'
@@ -73,44 +102,21 @@ if __name__ == "__main__":
     attendance_file='Meet.xlsx'
     attendance_sheet_name='Attendance'
 
-    list_sheet = open_excel_sheet(list_file,list_sheet_name)
-    list_row_index = find_word_in_row(list_sheet, list_column, list_word)
-    list_students = extract_list_by_index(list_sheet, list_row_index, list_column)
+    for class_name in class_list:
+        print('########## Iniciando verificación de asistencia de {}'.format(class_name))
+        print('########## Iniciando detección de lista oficial de {}'.format(class_name))
+        list_sheet = open_excel_sheet(class_name+'.xlsx',list_sheet_name)
+        list_row_index = find_word_in_row(list_sheet, list_column, list_word)
+        list_students = extract_list_by_index(list_sheet, list_row_index, list_column)
 
-    attendance_sheet=open_excel_sheet(attendance_file,attendance_sheet_name)
-    attendance_column_index = find_word_in_column(attendance_sheet,1,'servos')
-    attendance_students = extract_list_by_index(attendance_sheet, 2, attendance_column_index[0:-1])
+        print('########## Iniciando busqueda de columna de asistencia de {}'.format(class_name))
+        attendance_sheet=open_excel_sheet(attendance_file,attendance_sheet_name)
+        attendance_column_index = find_word_in_column(attendance_sheet,1,class_name)
+        attendance_students = extract_list_by_index(attendance_sheet, 2, attendance_column_index[0:-1])
 
-    attended_students, attended_not_in_list = attended_split(list_students, attendance_students)
-    absence_students = extract_absence_students(list_students, attended_students)
-    #print('Lista de estudiantes')
-    #for item in attendance_students:
-    #    print(item)
-    #print('Lista de estudiantes')
-    #for item in list_students:
-    #    print(item)
+        print('########## Iniciando comparación de lista {}'.format(class_name))
+        attended_students, attended_not_in_list = attended_split(list_students, attendance_students)
+        absence_students = extract_absence_students(list_students, attended_students)
 
-    print('Asistentes en lista:')
-    for item in attended_students:
-        print(item)
-    print('----------------------------------')
-
-    print('Asistentes NO en lista')
-    for item in attended_not_in_list:        
-        print(item)
-
-    print('----------------------------------')
-
-    print('Ausentes')
-    for item in absence_students:        
-        print(item)
-
-    book = Workbook()
-    sheet = book.active
-    sheet.title = 'servos'
-    column = 'A'
-    sheet['A1']='Asistentes en lista'
-    for row in range (0, len(attended_students)):
-        sheet[column + str(row+2)] = attended_students[row]
-
-    book.save("report.xlsx")
+        print('########## Escribiendo el reporte en report.xlsx en la hoja {}'.format(class_name))
+        write_report(class_name, list_students, attended_students, attended_not_in_list, absence_students)
